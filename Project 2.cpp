@@ -13,10 +13,10 @@ bool gamePaused, displayStage = false, collision = false;
 float frameRate, myCarSpeed = 0.0f, rotationDegrees = 0.2f / 10.0f, speedLimit = 0.3f, speedIncrementer = 0.001f, rotationAmt = 0.0f, hoverSpeed = 2.0f;
 const float maxRotation = 0.2f, steerAmt = 20.0f, carGround = 7.5f;
 
-const float objFloor = 1.0f, isleWidth = 2.68f, isleLength = 3.42f;
+const float isle_Width = 2.68f, isle_Length = 3.42f;
 float isles_minX[isle_count], isles_maxX[isle_count], isles_minZ[isle_count], isles_maxZ[isle_count];
 
-const float cpLength = 9.86f, cpWidth = 1.28f;
+const float checkpoint_pLength = 9.86f, cpWidth = 1.28f;
 float cp_left_minX[isle_count], cp_left_maxX[isle_count], cp_left_minZ[isle_count], cp_left_maxZ[isle_count];
 float cp_right_minX[isle_count], cp_right_maxX[isle_count], cp_right_minZ[isle_count], cp_right_maxZ[isle_count];
 float cp_through_minX[isle_count], cp_through_maxX[isle_count], cp_through_minZ[isle_count], cp_through_maxZ[isle_count];
@@ -111,7 +111,6 @@ void update_car()
 		angle = myCarSpeed / rotationDegrees;
 		bank = rotationAmt / rotationDegrees;
 		myCar->ResetOrientation();
-		//myCar->RotateLocalX(-angle);	//Cause to fly
 		myCar->RotateLocalZ(-bank * 2.0f);
 		myCar->RotateLocalY(bank);
 	}
@@ -137,8 +136,8 @@ void main()
 	for (int i = 0; i < CheckPoint_count; i++)
 	{
 		Check_Points[i]->ScaleY(2.0f);
-		cp_through_minX[i] = Check_Points[i]->GetX() - cpLength;
-		cp_through_maxX[i] = Check_Points[i]->GetX() + cpLength;
+		cp_through_minX[i] = Check_Points[i]->GetX() - checkpoint_pLength;
+		cp_through_maxX[i] = Check_Points[i]->GetX() + checkpoint_pLength;
 		cp_through_minZ[i] = Check_Points[i]->GetZ() - cpWidth;
 		cp_through_maxZ[i] = Check_Points[i]->GetZ() + cpWidth;
 		cp_left_minX[i] = Check_Points[i]->GetX() - 12.0f;
@@ -153,17 +152,16 @@ void main()
 
 	ICamera* myCamera = myEngine->CreateCamera(kManual, 0.0f, 20.0f, -60.0f); // Create a camera
 
-	IMesh* isleMesh = myEngine->LoadMesh("islestraight.x");	
+	IMesh* isleMesh = myEngine->LoadMesh("islestraight.x");
 	Track_isles[0] = isleMesh->CreateModel(-10, 0, 40);	Track_isles[1] = isleMesh->CreateModel(10, 0, 40);
 	Track_isles[2] = isleMesh->CreateModel(10, 0, 53);	Track_isles[3] = isleMesh->CreateModel(-10, 0, 53);
 	for (int i = 0; i < isle_count; i++)
 	{
-		isles_minX[i] = Track_isles[i]->GetX() - isleWidth;
-		isles_maxX[i] = Track_isles[i]->GetX() + isleWidth;
-		isles_minZ[i] = Track_isles[i]->GetZ() - isleLength;
-		isles_maxZ[i] = Track_isles[i]->GetZ() + isleLength;
+		isles_minX[i] = Track_isles[i]->GetX() - isle_Width;
+		isles_maxX[i] = Track_isles[i]->GetX() + isle_Width;
+		isles_minZ[i] = Track_isles[i]->GetZ() - isle_Length;
+		isles_maxZ[i] = Track_isles[i]->GetZ() + isle_Length;
 	}
-
 	IMesh* hoverCarMesh = myEngine->LoadMesh("race2.x");	myCar = hoverCarMesh->CreateModel(0.0f, 2.0f, -20.0f);
 	myCamera->AttachToParent(myCar);
 	myCar->SetSkin("spengland.jpg");
@@ -178,7 +176,7 @@ void main()
 		{
 			switch (myCarStatus)
 			{
-			case Hovering:
+			case Hovering:	//Demo State
 				myCamera->RotateY(myEngine->GetMouseMovementX() * 0.1f);
 				gameFont->Draw("Press space bar to begin!", 500, 200, kBlack);
 				break;
@@ -194,11 +192,11 @@ void main()
 			}
 			printGameCompletedStage(gameFont);
 
-			for (int i = 0; i < CheckPoint_count; i++)
+			for (int loop = 0; loop < CheckPoint_count; loop++)
 			{   // Check for collision between car and sides of the check point
-				detect_collision(cp_left_minX[i], cp_left_maxX[i], cp_left_minZ[i], cp_left_maxZ[i]);
-				detect_collision(cp_right_minX[i], cp_right_maxX[i], cp_right_minZ[i], cp_right_maxZ[i]);
-				isSatgeCompleted(i);
+				detect_collision(cp_left_minX[loop], cp_left_maxX[loop], cp_left_minZ[loop], cp_left_maxZ[loop]);
+				detect_collision(cp_right_minX[loop], cp_right_maxX[loop], cp_right_minZ[loop], cp_right_maxZ[loop]);
+				isSatgeCompleted(loop);
 				if (1 == currentGameStage)
 					GameState = Stage_1_Complete;
 				if (2 == currentGameStage)
@@ -208,24 +206,24 @@ void main()
 			for (int isle = 0; isle < isle_count; isle++)	// Check collision between car and isles
 				detect_collision(isles_minX[isle], isles_maxX[isle], isles_minZ[isle], isles_maxZ[isle]);
 
-			if (myEngine->KeyHeld(Key_W))
+			if (myEngine->KeyHeld(Key_W))//Forward
 			{
 				if (myCarSpeed < speedLimit && myCarStatus == Racing) myCarSpeed += speedIncrementer;
 			}
-			else if (myEngine->KeyHeld(Key_S) && myCarStatus == Racing)
+			else if (myEngine->KeyHeld(Key_S) && myCarStatus == Racing)	//BackWard
 			{
 				if (myCarSpeed > -speedLimit / 3.0f) myCarSpeed -= speedIncrementer;
 			}
 			else myCarSpeed = 0.0f;
 
-			if (myEngine->KeyHeld(Key_A) && myCarStatus == Racing)
+			if (myEngine->KeyHeld(Key_A) && myCarStatus == Racing)		//Left
 				move_left(myCamera);
-			else if (myEngine->KeyHeld(Key_D) && myCarStatus == Racing)
+			else if (myEngine->KeyHeld(Key_D) && myCarStatus == Racing)	//Right
 				move_right(myCamera);
 			else
 				remove_rotation();
 
-			if (myEngine->KeyHit(Key_Space) && myCarStatus == Hovering)
+			if (myEngine->KeyHit(Key_Space) && myCarStatus == Hovering)	//SpaceBar
 			{
 				GameState = Count_Down;
 				gameFont->Draw("", 500, 200, kBlack);
@@ -249,40 +247,37 @@ void main()
 				myCamera->SetPosition(0.0f, 20.0f, -60.0f);
 			}
 
-			if (myEngine->KeyHit(Key_1))
+			if (myEngine->KeyHit(Key_1))	//First-Person Camera
 			{
 				myCamera->ResetOrientation();
 				myCamera->SetPosition(myCar->GetX(), myCar->GetY() + 3.0f, myCar->GetZ() + 3.0f);
 			}
-			if (myEngine->KeyHit(Key_C))
+			if (myEngine->KeyHit(Key_C))	//Reset Camera
 			{
 				myCamera->ResetOrientation();
 				myCamera->SetPosition(myCar->GetX(), 20.0f, myCar->GetZ() - 40.0f);
 			}
-			if (myEngine->KeyHit(Key_P))
+			if (myEngine->KeyHit(Key_P))//Pause
 				gamePaused = true;
 
-			if (myEngine->KeyHit(Key_3))
+			if (myEngine->KeyHit(Key_2))	//Free-Moving Camera
+				myCamera->SetPosition(-30.0f, 80.0f, -180.0f);
+			if (myEngine->KeyHit(Key_3))	//Third-Person Camera
 				myCamera->SetPosition(myCar->GetX(), 20.0f, myCar->GetZ() - 40.0f);
-			if (myEngine->KeyHit(Key_4))
+			if (myEngine->KeyHit(Key_4))	//Surveillance Camera
 				myCamera->SetPosition(-30.0f, 80.0f, -180.0f);
-			if (myEngine->KeyHit(Key_2))
-				myCamera->SetPosition(-30.0f, 80.0f, -180.0f);
-			if (myEngine->KeyHit(Key_Up) && myCamera->GetZ() <= cameraForwardsLimit)
+			if (myEngine->KeyHit(Key_Up) && myCamera->GetZ() <= cameraForwardsLimit)	//Camera Forward
 				myCamera->MoveZ(cameraSpeed);
-			if (myEngine->KeyHit(Key_Down) && myCamera->GetZ() >= -cameraBackwardsLimit)
+			if (myEngine->KeyHit(Key_Down) && myCamera->GetZ() >= -cameraBackwardsLimit)//Camera Backward
 				myCamera->MoveZ(-cameraSpeed);
-			if (myEngine->KeyHit(Key_Left) && myCamera->GetX() >= cameraLeftLimit)
+			if (myEngine->KeyHit(Key_Left) && myCamera->GetX() >= cameraLeftLimit)		//Camera left
 				myCamera->MoveX(-cameraSpeed);
-			if (myEngine->KeyHit(Key_Right) && myCamera->GetX() <= cameraRightLimit)
+			if (myEngine->KeyHit(Key_Right) && myCamera->GetX() <= cameraRightLimit)	//Camera right
 				myCamera->MoveX(cameraSpeed);
 		}
 
 		if (gamePaused && myEngine->KeyHit(Key_P))
 			gamePaused = false;	//Game Pause/Resume
-
-		if (GameState == Race_Complete)
-			gamePaused = true;	// End the game
 
 		if (myEngine->KeyHit(Key_Escape))
 			myEngine->Stop();	// Quit the game
