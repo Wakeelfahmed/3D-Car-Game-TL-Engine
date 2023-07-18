@@ -1,22 +1,16 @@
 #include <TL-Engine.h>	// TL-Engine include file and namespace
-#include <sstream>      // Writing to game screen
-using namespace tle; // T-L Engine definitions (I guess)
-using namespace std; // Standard definitions
-#include<iostream>
-#include <windows.h> // Include this header for Windows-specific Sleep()
-
+using namespace tle;	// T-L Engine definitions
+#include<windows.h>
 enum currentState { Demo, Count_Down, Stage_0_Complete, Stage_1_Complete, Stage_2, Race_Complete }; // Game states										 
 enum carState { Hovering, WaitingForGo, Racing };
-enum hoverState { HoverUp, HoverDown, None };
 currentState GameState = Demo;
 const int CheckPoint_count = 2, isle_count = 4;
 
-ISprite* backdrop;	// Background sprite (used for Speed-o-meter)
-IModel* myCar, * Car_Temp, * track_isles[isle_count], * track_checkPoints[CheckPoint_count]; // Game Models/Assets
-
-int myCarStatus = Hovering, currentGameStage = 0;
+IModel* myCar, * Track_isles[isle_count], * Check_Points[CheckPoint_count]; // Game Models/Assets
+ISprite* GameState_BackdropSprite;	//Background sprite (used for Game State)
+int myCarStatus = 0, currentGameStage = 0;
 bool gamePaused, displayStage = false, collision = false;
-float frameRate, myCarSpeed, rotationDegrees, speedLimit = 0.3f, speedIncrementer = 0.001f, rotationAmt = 0.0f, hoverSpeed = 2.0f;
+float frameRate, myCarSpeed = 0.0f, rotationDegrees = 0.2f / 10.0f, speedLimit = 0.3f, speedIncrementer = 0.001f, rotationAmt = 0.0f, hoverSpeed = 2.0f;
 const float maxRotation = 0.2f, steerAmt = 20.0f, carGround = 7.5f;
 
 const float objFloor = 1.0f, isleWidth = 2.68f, isleLength = 3.42f;
@@ -56,130 +50,123 @@ void printGameCompletedStage(IFont* gameFont)
 }
 void print_BackDrop_CarSpeed_and_State(IFont* gameFont)
 {
-	gameFont->Draw("Speed: " + to_string(myCarSpeed), 5, 670, 0xFFFFA500);
-	if (GameState == Demo)
-		gameFont->Draw("State: Demo", 1075, 670, 0xFFFFA500);
-	else if (GameState == Count_Down)
-		gameFont->Draw("State: Count Down", 990, 670, 0xFFFFA500);
-	else if (GameState == Stage_0_Complete)
-		gameFont->Draw("State: Stage 0 Complete", 930, 670, 0xFFFFA500);
-	else if (GameState == Stage_1_Complete)
-		gameFont->Draw("State: Stage 1 Complete", 930, 670, 0xFFFFA500);
-	else if (GameState == Race_Complete)
-		gameFont->Draw("State: Race Complete", 940, 670, 0xFFFFA500);
-	else
-		gameFont->Draw("State: Unknown State", 1075, 670, 0xFFFFA500);
+	gameFont->Draw("Speed: " + std::to_string(myCarSpeed * 10).substr(0, 5), 10, 670, kMagenta);
+	if (gamePaused) {
+		GameState_BackdropSprite->SetX(1040);
+		gameFont->Draw("State: Paused", 1050, 670, kBlue);
+	}
+	else if (GameState == Demo) {
+		GameState_BackdropSprite->SetX(1050);
+		gameFont->Draw("State: Demo", 1075, 670, kBlue);
+	}
+	else if (GameState == Count_Down) {
+		GameState_BackdropSprite->SetX(980);
+		gameFont->Draw("State: Count Down", 990, 670, kBlue);
+	}
+	else if (GameState == Stage_0_Complete) {
+		GameState_BackdropSprite->SetX(920);
+		gameFont->Draw("State: Stage 0 Complete", 930, 670, kBlue);
+	}
+	else if (GameState == Stage_1_Complete) {
+		GameState_BackdropSprite->SetX(920);
+		gameFont->Draw("State: Stage 1 Complete", 930, 670, kBlue);
+	}
+	else if (GameState == Race_Complete) {
+		GameState_BackdropSprite->SetX(930);
+		gameFont->Draw("State: Race Complete", 945, 670, kBlue);
+	}
 }
-
 void stop_car()
 {
 	if (myCarSpeed > 0.0f)	myCarSpeed = -myCarSpeed / 3.5f;
 	else	myCarSpeed -= myCarSpeed * 1.5f;
 }
-
 void detect_collision(float objMinX, float objMaxX, float objMinZ, float objMaxZ)
 {
-	collision = (Car_Temp->GetLocalX() < objMaxX && Car_Temp->GetLocalX() > objMinX && Car_Temp->GetLocalZ() < objMaxZ && Car_Temp->GetLocalZ() > objMinZ);
+	collision = (myCar->GetLocalX() < objMaxX && myCar->GetLocalX() > objMinX && myCar->GetLocalZ() < objMaxZ && myCar->GetLocalZ() > objMinZ);
 	if (collision)
 		stop_car();
 }
-
 void move_left(ICamera* myCamera)
 {
 	if (rotationAmt >= -maxRotation) rotationAmt -= 0.4f * frameRate;
-	Car_Temp->RotateLocalY(-steerAmt * frameRate);
+	myCar->RotateLocalY(-steerAmt * frameRate);
 }
-
 void move_right(ICamera* myCamera)
 {
 	if (rotationAmt < maxRotation) rotationAmt += 0.4f * frameRate;
-	Car_Temp->RotateLocalY(steerAmt * frameRate);
+	myCar->RotateLocalY(steerAmt * frameRate);
 }
-
 void remove_rotation()
 {
 	if (rotationAmt > 0.0f)  rotationAmt -= 0.4f * frameRate;
 	if (rotationAmt < 0.01f)  rotationAmt += 0.4f * frameRate;
 }
-
 void update_car()
 {
 	float bank, angle;
 	if (!collision)
 	{
-		Car_Temp->MoveLocalZ(myCarSpeed);
-		myCar->SetZ(Car_Temp->GetZ());
-		myCar->SetX(Car_Temp->GetX());
+		myCar->MoveLocalZ(myCarSpeed);
 		angle = myCarSpeed / rotationDegrees;
 		bank = rotationAmt / rotationDegrees;
 		myCar->ResetOrientation();
-		myCar->RotateLocalX(-angle);
+		//myCar->RotateLocalX(-angle);	//Cause to fly
 		myCar->RotateLocalZ(-bank * 2.0f);
 		myCar->RotateLocalY(bank);
 	}
 }
-
 void main()
 {
 	system("Hover Car Racing Console");			// Set TL Engine Title
 	I3DEngine* myEngine = New3DEngine(kTLX);	// Create a 3D engine (using TLX engine here)
 	myEngine->StartWindowed();
 	myEngine->SetWindowCaption("Hover Car Racing");	// Set Window title
-	myEngine->AddMediaFolder("./media");	//Media Folder (all Meshes, fonsts here)
-	ISprite* backdropSprite = myEngine->CreateSprite("ui_backdrop.jpg", -450.0f, 660.0f, 0.0f);
-	IFont* gameFont = myEngine->LoadFont("Monotype Corsiva", 45);
-	IFont* SpeedFont = myEngine->LoadFont("Monotype Corsiva", 45);
-	IMesh* groundMesh = myEngine->LoadMesh("ground.x");
-	IModel* ground = groundMesh->CreateModel(0.0f, 0.0f, 0.0f);
-	IMesh* skyboxMesh = myEngine->LoadMesh("skybox 07.x");
-	IModel* skybox = skyboxMesh->CreateModel(0.0f, -960.0f, 0.0f);
+	myEngine->AddMediaFolder("./media");	//Media Folder (all Meshes, fonts here)
 
-	IMesh* checkPointMesh = myEngine->LoadMesh("checkpoint.x");
-	track_checkPoints[0] = checkPointMesh->CreateModel(2.0f, objFloor, 30.0f);
-	track_checkPoints[1] = checkPointMesh->CreateModel(2.0f, objFloor, 300.0f);
+	ISprite* backdropSprite = myEngine->CreateSprite("ui_backdrop.jpg", -450.0f, 660.0f, 0.0f);	//Background sprite (used for Speed o Meter)
+	GameState_BackdropSprite = myEngine->CreateSprite("ui_backdrop.jpg", 950.0f, 660.0f, 0.0f);	//Background sprite (used for Game State)
+
+	IFont* gameFont = myEngine->LoadFont("Monotype Corsiva", 45);	//Font
+	IFont* SpeedFont = myEngine->LoadFont("Monotype Corsiva", 45);	//Font
+
+	IMesh* groundMesh = myEngine->LoadMesh("ground.x");		IModel* ground = groundMesh->CreateModel(0.0f, 0.0f, 0.0f);
+	IMesh* skyboxMesh = myEngine->LoadMesh("skybox 07.x");	IModel* skybox = skyboxMesh->CreateModel(0, -960, 0);
+
+	IMesh* checkPointMesh = myEngine->LoadMesh("checkpoint.x");	Check_Points[0] = checkPointMesh->CreateModel(0, 0, 0);	Check_Points[1] = checkPointMesh->CreateModel(0, 0, 150);
 	for (int i = 0; i < CheckPoint_count; i++)
 	{
-		track_checkPoints[i]->ScaleY(2.0f);
-		cp_through_minX[i] = track_checkPoints[i]->GetX() - cpLength;
-		cp_through_maxX[i] = track_checkPoints[i]->GetX() + cpLength;
-		cp_through_minZ[i] = track_checkPoints[i]->GetZ() - cpWidth;
-		cp_through_maxZ[i] = track_checkPoints[i]->GetZ() + cpWidth;
-		cp_left_minX[i] = track_checkPoints[i]->GetX() - 12.0f;
-		cp_left_maxX[i] = track_checkPoints[i]->GetX() - 7.0f;
-		cp_left_minZ[i] = track_checkPoints[i]->GetZ() - 10.0f;
-		cp_left_maxZ[i] = track_checkPoints[i]->GetZ() + 5.0f;
-		cp_right_minX[i] = track_checkPoints[i]->GetX() + 7.0f;
-		cp_right_maxX[i] = track_checkPoints[i]->GetX() + 12.0f;
-		cp_right_minZ[i] = track_checkPoints[i]->GetZ() - 10.0f;
-		cp_right_maxZ[i] = track_checkPoints[i]->GetZ() + 5.0f;
+		Check_Points[i]->ScaleY(2.0f);
+		cp_through_minX[i] = Check_Points[i]->GetX() - cpLength;
+		cp_through_maxX[i] = Check_Points[i]->GetX() + cpLength;
+		cp_through_minZ[i] = Check_Points[i]->GetZ() - cpWidth;
+		cp_through_maxZ[i] = Check_Points[i]->GetZ() + cpWidth;
+		cp_left_minX[i] = Check_Points[i]->GetX() - 12.0f;
+		cp_left_maxX[i] = Check_Points[i]->GetX() - 7.0f;
+		cp_left_minZ[i] = Check_Points[i]->GetZ() - 10.0f;
+		cp_left_maxZ[i] = Check_Points[i]->GetZ() + 5.0f;
+		cp_right_minX[i] = Check_Points[i]->GetX() + 7.0f;
+		cp_right_maxX[i] = Check_Points[i]->GetX() + 12.0f;
+		cp_right_minZ[i] = Check_Points[i]->GetZ() - 10.0f;
+		cp_right_maxZ[i] = Check_Points[i]->GetZ() + 5.0f;
 	}
 
 	ICamera* myCamera = myEngine->CreateCamera(kManual, 0.0f, 20.0f, -60.0f); // Create a camera
 
-	IMesh* isleMesh = myEngine->LoadMesh("islestraight.x");
-	track_isles[0] = isleMesh->CreateModel(-12.5f, objFloor, 190.0f);
-	track_isles[1] = isleMesh->CreateModel(17.5f, objFloor, 190.0f);
-	track_isles[2] = isleMesh->CreateModel(17.5f, objFloor, 203.0f);
-	track_isles[3] = isleMesh->CreateModel(-12.5f, objFloor, 203.0f);
+	IMesh* isleMesh = myEngine->LoadMesh("islestraight.x");	
+	Track_isles[0] = isleMesh->CreateModel(-10, 0, 40);	Track_isles[1] = isleMesh->CreateModel(10, 0, 40);
+	Track_isles[2] = isleMesh->CreateModel(10, 0, 53);	Track_isles[3] = isleMesh->CreateModel(-10, 0, 53);
 	for (int i = 0; i < isle_count; i++)
 	{
-		isles_minX[i] = track_isles[i]->GetX() - isleWidth;
-		isles_maxX[i] = track_isles[i]->GetX() + isleWidth;
-		isles_minZ[i] = track_isles[i]->GetZ() - isleLength;
-		isles_maxZ[i] = track_isles[i]->GetZ() + isleLength;
+		isles_minX[i] = Track_isles[i]->GetX() - isleWidth;
+		isles_maxX[i] = Track_isles[i]->GetX() + isleWidth;
+		isles_minZ[i] = Track_isles[i]->GetZ() - isleLength;
+		isles_maxZ[i] = Track_isles[i]->GetZ() + isleLength;
 	}
 
-	IMesh* hoverCarMesh = myEngine->LoadMesh("race2.x");
-	IMesh* dummyMesh = myEngine->LoadMesh("race2.x");
-
-	myCar = hoverCarMesh->CreateModel(0.0f, 2.0f, -20.0f);
-	myCarSpeed = 0.0f;
-	Car_Temp = dummyMesh->CreateModel(0.0f, carGround, -20.0f);
-	myCar->AttachToParent(Car_Temp);
-	myCamera->AttachToParent(Car_Temp);
+	IMesh* hoverCarMesh = myEngine->LoadMesh("race2.x");	myCar = hoverCarMesh->CreateModel(0.0f, 2.0f, -20.0f);
+	myCamera->AttachToParent(myCar);
 	myCar->SetSkin("spengland.jpg");
-
-	rotationDegrees = 0.2f / 10.0f;
 
 	while (myEngine->IsRunning())
 	{
@@ -292,12 +279,13 @@ void main()
 		}
 
 		if (gamePaused && myEngine->KeyHit(Key_P))
-			gamePaused = false;		//Game Pause/Resume
+			gamePaused = false;	//Game Pause/Resume
 
 		if (GameState == Race_Complete)
-			gamePaused = true; // End the game
+			gamePaused = true;	// End the game
+
 		if (myEngine->KeyHit(Key_Escape))
-			myEngine->Stop();	     // Quit the game
+			myEngine->Stop();	// Quit the game
 	}
 	myEngine->Delete();
 }
